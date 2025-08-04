@@ -1,6 +1,6 @@
 // src/components/EnglishSectionPage.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, type JSX } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 
@@ -11,6 +11,7 @@ interface Section {
   instructions: string;
   time_minutes: number;
   order: number;
+  number_of_questions: number; // Ensure this is included from your schema
 }
 
 interface Passage {
@@ -32,7 +33,7 @@ interface Question {
   correct_answer_choice_id: number | null;
   passage_id: number | null;
   answer_choices: AnswerChoice[];
-  question_context: string | null;
+  question_context: string | null; // This will store the exact phrase to highlight
 }
 
 const EnglishSectionPage: React.FC = () => {
@@ -49,6 +50,9 @@ const EnglishSectionPage: React.FC = () => {
   const [questionsWithoutPassage, setQuestionsWithoutPassage] = useState<
     Question[]
   >([]);
+  // New state to hold all questions in their global sorted order
+  const [allSortedQuestions, setAllSortedQuestions] = useState<Question[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPassageIndex, setCurrentPassageIndex] = useState(0);
@@ -67,6 +71,8 @@ const EnglishSectionPage: React.FC = () => {
       correctAnswer: number;
     }[]
   >([]);
+  // State to manage active highlighting
+  const [activeQuestionId, setActiveQuestionId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSectionPassagesAndQuestions = async () => {
@@ -80,10 +86,10 @@ const EnglishSectionPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch section details
+        // Fetch section details, including number_of_questions
         const { data: sectionData, error: sectionError } = await supabase
           .from('sections')
-          .select('*')
+          .select('*') // Ensure number_of_questions is fetched with '*'
           .eq('id', parseInt(sectionId))
           .single();
 
@@ -123,7 +129,7 @@ const EnglishSectionPage: React.FC = () => {
         if (questionsError) throw questionsError;
 
         const groupedQuestions: { [passageId: number]: Question[] } = {};
-        const standaloneQuestions: Question[] = [];
+        const standaloneQuestions: Question[] = []; // Use let for re-assignment
 
         questionsData?.forEach((q) => {
           const questionWithChoices = {
@@ -148,8 +154,22 @@ const EnglishSectionPage: React.FC = () => {
           groupedQuestions[parseInt(passageId)].sort((a, b) => a.id - b.id);
         });
 
+        // Sort standalone questions by ID
+        standaloneQuestions.sort((a, b) => a.id - b.id);
+
+        // Create a single, globally ordered list of all questions
+        const tempAllSortedQuestions: Question[] = [];
+        tempAllSortedQuestions.push(...standaloneQuestions); // Add standalone questions first
+
+        (passagesData || []).forEach((p) => {
+          if (groupedQuestions[p.id]) {
+            tempAllSortedQuestions.push(...groupedQuestions[p.id]);
+          }
+        });
+
         setQuestionsByPassage(groupedQuestions);
         setQuestionsWithoutPassage(standaloneQuestions);
+        setAllSortedQuestions(tempAllSortedQuestions); // Set the global list of questions
       } catch (err: unknown) {
         if (err instanceof Error) {
           console.error('Error fetching data:', err.message);
@@ -168,10 +188,12 @@ const EnglishSectionPage: React.FC = () => {
 
   const handleNextPassage = () => {
     setCurrentPassageIndex((prevIndex) => prevIndex + 1);
+    setActiveQuestionId(null); // Clear highlight when changing passage
   };
 
   const handlePreviousPassage = () => {
     setCurrentPassageIndex((prevIndex) => prevIndex - 1);
+    setActiveQuestionId(null); // Clear highlight when changing passage
   };
 
   const handleUserAnswer = (questionId: number, answerChoiceId: number) => {
@@ -190,14 +212,8 @@ const EnglishSectionPage: React.FC = () => {
       correctAnswer: number;
     }[] = [];
 
-    const allQuestions = [...questionsWithoutPassage];
-    passages.forEach((p) => {
-      if (questionsByPassage[p.id]) {
-        allQuestions.push(...questionsByPassage[p.id]);
-      }
-    });
-
-    allQuestions.forEach((question) => {
+    // Use allSortedQuestions for score calculation
+    allSortedQuestions.forEach((question) => {
       const userAnswerId = userAnswers[question.id];
       const correctAnswerId = question.correct_answer_choice_id;
 
@@ -216,15 +232,74 @@ const EnglishSectionPage: React.FC = () => {
 
     setScore({
       correct: correctAnswersCount,
-      total: allQuestions.length,
+      total: allSortedQuestions.length, // Use allSortedQuestions.length for total
     });
     setAnswerReport(report);
     setShowReport(true);
   };
 
+  // Function to render passage text with highlights
+  const renderPassageWithHighlights = useCallback(
+    (passageText: string, questions: Question[], allQuestionsForNumbering: Question[]) => {
+      let parts: (string | JSX.Element)[] = [passageText];
+
+      questions.forEach((question) => {
+        const context = question.text;
+        if (context) {
+          // Calculate the global question number
+          const globalQuestionNumber = allQuestionsForNumbering.findIndex(q => q.id === question.id) + 1;
+
+          const newParts: (string | JSX.Element)[] = [];
+          parts.forEach((part) => {
+            if (typeof part === 'string') {
+              // Use a regular expression with 'g' flag for global replacement
+              const regex = new RegExp(
+                `(${context.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, // Escape special characters
+                'g'
+              );
+              const split = part.split(regex);
+
+              split.forEach((subPart, index) => {
+                if (subPart === context) {
+                  newParts.push(
+                    <span
+                      key={`${question.id}-${index}`} // Unique key for each highlight instance
+                      id={`highlight-q-${question.id}`}
+                      className={`relative cursor-pointer rounded-md px-1 transition-all duration-200 ${
+                        activeQuestionId === question.id
+                          ? 'bg-yellow-300 shadow-md ring-2 ring-yellow-500' // Active highlight style
+                          : 'bg-yellow-100 hover:bg-yellow-200' // Default highlight style
+                      }`}
+                      onMouseEnter={() => setActiveQuestionId(question.id)}
+                      onMouseLeave={() => setActiveQuestionId(null)}
+                    >
+                      {subPart}
+                      {/* Add a small number next to the highlight like in the PDF */}
+                      <span className="absolute -top-3 -right-1 text-xs font-bold text-blue-700 bg-blue-100 px-1 rounded-full">
+                        {globalQuestionNumber}
+                      </span>
+                    </span>
+                  );
+                } else {
+                  newParts.push(subPart);
+                }
+              });
+            } else {
+              newParts.push(part); // Keep existing JSX elements (already highlighted parts)
+            }
+          });
+          parts = newParts;
+        }
+      });
+      return <>{parts}</>;
+    },
+    [activeQuestionId] // Re-render when activeQuestionId changes
+  );
+
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <p className="text-xl text-gray-700">Loading...</p>
       </div>
     );
@@ -232,7 +307,7 @@ const EnglishSectionPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <p className="text-xl text-red-600">Error: {error}</p>
       </div>
     );
@@ -251,13 +326,8 @@ const EnglishSectionPage: React.FC = () => {
         </div>
         <div className="max-w-6xl mx-auto space-y-8">
           {answerReport.map((item) => {
-            const allQuestions = [...questionsWithoutPassage];
-            passages.forEach((p) => {
-              if (questionsByPassage[p.id]) {
-                allQuestions.push(...questionsByPassage[p.id]);
-              }
-            });
-            const question = allQuestions.find((q) => q.id === item.questionId);
+            // Find the question from the global list for report display
+            const question = allSortedQuestions.find((q) => q.id === item.questionId);
             const userAnswerText = question?.answer_choices.find(
               (ac) => ac.id === item.userAnswer
             )?.text;
@@ -342,10 +412,12 @@ const EnglishSectionPage: React.FC = () => {
                 </h2>
                 <div className="flex flex-col md:flex-row gap-8">
                   {/* Passage column */}
-                  <div className="md:w-1/2 p-4 bg-gray-100 rounded-md overflow-y-auto max-h-[80vh]">
-                    <p className="text-gray-800 leading-loose whitespace-pre-wrap">
-                      {currentPassage.passage_text}
-                    </p>
+                  <div className="md:w-1/2 p-4 bg-gray-100 rounded-md overflow-y-auto max-h-[80vh] text-gray-800 leading-loose whitespace-pre-wrap">
+                    {renderPassageWithHighlights(
+                      currentPassage.passage_text,
+                      currentPassageQuestions,
+                      allSortedQuestions // Pass the global question list
+                    )}
                   </div>
 
                   {/* Questions column */}
@@ -354,17 +426,25 @@ const EnglishSectionPage: React.FC = () => {
                       Questions for this Passage
                     </h3>
                     {currentPassageQuestions.length > 0 ? (
-                      currentPassageQuestions.map((question, index) => (
+                      currentPassageQuestions.map((question) => (
                         <div
                           key={question.id}
-                          className="bg-gray-50 shadow-sm rounded-lg p-4 border border-gray-200"
+                          id={`question-${question.id}`} // Add ID for scrolling/linking
+                          className={`bg-gray-50 shadow-sm rounded-lg p-4 border transition-all duration-200 ${
+                            activeQuestionId === question.id
+                              ? 'border-blue-500 shadow-lg' // Active question style
+                              : 'border-gray-200'
+                          }`}
+                          onMouseEnter={() => setActiveQuestionId(question.id)}
+                          onMouseLeave={() => setActiveQuestionId(null)}
                         >
                           <h4 className="text-lg font-semibold text-gray-700 mb-2">
-                            Question {index + 1}
+                            {/* Use global index for question numbering */}
+                            Question {allSortedQuestions.findIndex(q => q.id === question.id) + 1}
                           </h4>
                           {question.question_context && (
-                            <h6 className="p-4 border bg-gray-200">
-                              {question.question_context}
+                            <h6 className="p-4 border bg-gray-200 rounded-md text-sm text-gray-700 mb-3">
+                              Context: "{question.question_context}"
                             </h6>
                           )}
                           <p className="text-gray-700 mb-3">{question.text}</p>
@@ -429,17 +509,22 @@ const EnglishSectionPage: React.FC = () => {
               <button
                 onClick={handlePreviousPassage}
                 disabled={currentPassageIndex === 0}
-                className="px-6 py-2 bg-gray-300 rounded-md disabled:opacity-50"
+                className="px-6 py-2 bg-gray-300 rounded-md disabled:opacity-50 hover:bg-gray-400 transition-colors"
               >
                 Previous
               </button>
-              <span className="text-lg self-center">
+              <span className="text-lg self-center text-gray-700">
                 Passage {currentPassageIndex + 1} of {passages.length}
+                {section?.number_of_questions && (
+                  <span className="ml-4">
+                    Total Questions: {section.number_of_questions}
+                  </span>
+                )}
               </span>
               {isLastPassage ? (
                 <button
                   onClick={handleSubmit}
-                  className="px-6 py-2 bg-green-600 text-white rounded-md"
+                  className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                 >
                   Submit
                 </button>
@@ -447,7 +532,7 @@ const EnglishSectionPage: React.FC = () => {
                 <button
                   onClick={handleNextPassage}
                   disabled={currentPassageIndex >= passages.length - 1}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md disabled:opacity-50 hover:bg-blue-700 transition-colors"
                 >
                   Next
                 </button>
