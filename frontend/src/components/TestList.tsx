@@ -80,7 +80,7 @@ const TestList: React.FC = () => {
   // Function to handle section selection
   const handleSectionSelect = (testId: number, section: Section) => {
     console.log(`User wants to take ${section.type} section (ID: ${section.id}) of Test (ID: ${testId})`);
-    navigate(`/test/${testId}/section/${section.id}`);
+    navigate(`/test/${testId}/section/${section.type}/${section.id}`); 
     // Here you would typically navigate to a new page,
     // update global state, or trigger a modal to start the test.
     // Example: navigate(`/test/${testId}/section/${section.id}`);

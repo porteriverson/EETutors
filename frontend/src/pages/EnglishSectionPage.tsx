@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, type JSX } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
+import Timer from '../components/Timer'; // Import the new Timer component
 
 // Define interfaces for data you'll fetch
 interface Section {
@@ -73,11 +74,75 @@ const EnglishSectionPage: React.FC = () => {
   >([]);
   // State to manage active highlighting
   const [activeQuestionId, setActiveQuestionId] = useState<number | null>(null);
+  // State for the 5-minute warning message
+  const [showWarningModal, setShowWarningModal] = useState(false);
+
+  // Define timerKey for this section
+  const timerKey = `test_${testId}_section_${sectionId}`;
+
+  const handleSubmit = useCallback(() => {
+    let correctAnswersCount = 0;
+    const report: {
+      questionId: number;
+      isCorrect: boolean;
+      userAnswer: number;
+      correctAnswer: number;
+    }[] = [];
+
+    // Use allSortedQuestions for score calculation
+    allSortedQuestions.forEach((question) => {
+      const userAnswerId = userAnswers[question.id];
+      const correctAnswerId = question.correct_answer_choice_id;
+
+      const isCorrect = userAnswerId === correctAnswerId;
+      if (isCorrect) {
+        correctAnswersCount++;
+      }
+
+      report.push({
+        questionId: question.id,
+        isCorrect,
+        userAnswer: userAnswerId,
+        correctAnswer: correctAnswerId ?? -1,
+      });
+    });
+
+    setScore({
+      correct: correctAnswersCount,
+      total: allSortedQuestions.length, // Use allSortedQuestions.length for total
+    });
+    setAnswerReport(report);
+    setShowReport(true);
+
+    // --- Clear timer state from localStorage on submission ---
+    localStorage.removeItem(`timerEndTime_${timerKey}`);
+    localStorage.removeItem(`timerWarningShown_${timerKey}`);
+    // --- End Clear timer state ---
+
+  }, [allSortedQuestions, userAnswers, timerKey]); // Add timerKey to dependencies
+
+
+  // Function to handle timer reaching zero
+  const handleTimeUp = useCallback(() => {
+    // Automatically submit the section when time is up
+    handleSubmit();
+    // Optionally, you might want to prevent further interaction or show a specific message
+    console.log("Time's up! Section submitted automatically.");
+  }, [handleSubmit]); // Include handleSubmit in dependencies
+
+  // Function to handle 5-minute warning
+  const handleFiveMinuteWarning = useCallback(() => {
+    setShowWarningModal(true);
+    // Hide the modal after a few seconds
+    setTimeout(() => {
+      setShowWarningModal(false);
+    }, 3000); // Show for 3 seconds
+  }, []);
 
   useEffect(() => {
     const fetchSectionPassagesAndQuestions = async () => {
       if (!testId || !sectionId) {
-        setError('Test ID or Section ID is missing from the URL.');
+        setError('Test ID or Section Type is missing from the URL.');
         setLoading(false);
         return;
       }
@@ -100,7 +165,7 @@ const EnglishSectionPage: React.FC = () => {
         const { data: passagesData, error: passagesError } = await supabase
           .from('passages')
           .select('*')
-          .eq('section_id', parseInt(sectionId))
+          .eq('section_id', sectionData.id) // Use sectionData.id here
           .order('order', { ascending: true });
 
         if (passagesError) throw passagesError;
@@ -124,7 +189,7 @@ const EnglishSectionPage: React.FC = () => {
             )
           `
           )
-          .eq('section_id', parseInt(sectionId));
+          .eq('section_id', sectionData.id);
 
         if (questionsError) throw questionsError;
 
@@ -203,40 +268,6 @@ const EnglishSectionPage: React.FC = () => {
     }));
   };
 
-  const handleSubmit = () => {
-    let correctAnswersCount = 0;
-    const report: {
-      questionId: number;
-      isCorrect: boolean;
-      userAnswer: number;
-      correctAnswer: number;
-    }[] = [];
-
-    // Use allSortedQuestions for score calculation
-    allSortedQuestions.forEach((question) => {
-      const userAnswerId = userAnswers[question.id];
-      const correctAnswerId = question.correct_answer_choice_id;
-
-      const isCorrect = userAnswerId === correctAnswerId;
-      if (isCorrect) {
-        correctAnswersCount++;
-      }
-
-      report.push({
-        questionId: question.id,
-        isCorrect,
-        userAnswer: userAnswerId,
-        correctAnswer: correctAnswerId ?? -1,
-      });
-    });
-
-    setScore({
-      correct: correctAnswersCount,
-      total: allSortedQuestions.length, // Use allSortedQuestions.length for total
-    });
-    setAnswerReport(report);
-    setShowReport(true);
-  };
 
   // Function to render passage text with highlights
   const renderPassageWithHighlights = useCallback(
@@ -378,9 +409,27 @@ const EnglishSectionPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-4xl font-extrabold text-gray-900 mb-6 text-center">
-        Test {testId}: {section?.type} Section
-      </h1>
+      {/* 5-minute warning modal */}
+      {showWarningModal && (
+        <div className="fixed top-0 left-0 right-0 bg-red-100 border-b-2 border-red-400 text-red-800 px-6 py-3 flex items-center justify-center z-50 shadow-md">
+          <p className="text-xl font-bold">⏰ 5 Minutes Remaining! ⏰</p>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center max-w-6xl mx-auto mb-6">
+        <h1 className="text-4xl font-extrabold text-gray-900">
+          Test {testId}: {section?.type} Section
+        </h1>
+        {section?.time_minutes !== undefined && section.time_minutes > 0 && (
+          <Timer
+            initialMinutes={section.time_minutes}
+            onTimeUp={handleTimeUp}
+            onFiveMinuteWarning={handleFiveMinuteWarning}
+            timerKey={timerKey} // Pass the unique timer key
+          />
+        )}
+      </div>
+
       <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-lg p-8 mb-8">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">
           Instructions
