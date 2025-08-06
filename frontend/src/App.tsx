@@ -8,6 +8,7 @@ import EnglishSectionPage from './pages/EnglishSectionPage'
 import MathSectionPage from './pages/MathSectionPage'
 import ReadingSectionPage from './pages/ReadingSectionPage'
 import ScienceSectionPage from './pages/ScienceSectionPage'
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/test/:testId/section/Science/:sectionId" element={<ScienceSectionPage />} />
           </Routes>
         </BrowserRouter>
+        <Analytics />
       </div>
     </>
   )
