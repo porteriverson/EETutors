@@ -17,6 +17,7 @@ interface Section {
 
 interface Passage {
   id: number;
+  title: string;
   passage_text: string;
   order: number;
 }
@@ -118,9 +119,7 @@ const EnglishSectionPage: React.FC = () => {
     localStorage.removeItem(`timerEndTime_${timerKey}`);
     localStorage.removeItem(`timerWarningShown_${timerKey}`);
     // --- End Clear timer state ---
-
   }, [allSortedQuestions, userAnswers, timerKey]); // Add timerKey to dependencies
-
 
   // Function to handle timer reaching zero
   const handleTimeUp = useCallback(() => {
@@ -268,17 +267,21 @@ const EnglishSectionPage: React.FC = () => {
     }));
   };
 
-
   // Function to render passage text with highlights
   const renderPassageWithHighlights = useCallback(
-    (passageText: string, questions: Question[], allQuestionsForNumbering: Question[]) => {
+    (
+      passageText: string,
+      questions: Question[],
+      allQuestionsForNumbering: Question[]
+    ) => {
       let parts: (string | JSX.Element)[] = [passageText];
 
       questions.forEach((question) => {
         const context = question.text;
         if (context) {
           // Calculate the global question number
-          const globalQuestionNumber = allQuestionsForNumbering.findIndex(q => q.id === question.id) + 1;
+          const globalQuestionNumber =
+            allQuestionsForNumbering.findIndex((q) => q.id === question.id) + 1;
 
           const newParts: (string | JSX.Element)[] = [];
           parts.forEach((part) => {
@@ -327,7 +330,6 @@ const EnglishSectionPage: React.FC = () => {
     [activeQuestionId] // Re-render when activeQuestionId changes
   );
 
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -358,7 +360,9 @@ const EnglishSectionPage: React.FC = () => {
         <div className="max-w-6xl mx-auto space-y-8">
           {answerReport.map((item) => {
             // Find the question from the global list for report display
-            const question = allSortedQuestions.find((q) => q.id === item.questionId);
+            const question = allSortedQuestions.find(
+              (q) => q.id === item.questionId
+            );
             const userAnswerText = question?.answer_choices.find(
               (ac) => ac.id === item.userAnswer
             )?.text;
@@ -456,9 +460,10 @@ const EnglishSectionPage: React.FC = () => {
                 key={currentPassage.id}
                 className="bg-white shadow-lg rounded-lg p-6"
               >
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  Passage
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  Passage {currentPassage.order}
                 </h2>
+                <h4 className="font-bold text-gray-900 mb-4">{currentPassage.title}</h4>
                 <div className="flex flex-col md:flex-row gap-8">
                   {/* Passage column */}
                   <div className="md:w-1/2 p-4 bg-gray-100 rounded-md overflow-y-auto max-h-[80vh] text-gray-800 leading-loose whitespace-pre-wrap">
@@ -472,7 +477,7 @@ const EnglishSectionPage: React.FC = () => {
                   {/* Questions column */}
                   <div className="md:w-1/2 space-y-8 max-h-[80vh] overflow-y-auto">
                     <h3 className="text-xl font-bold text-gray-800">
-                      Questions for this Passage
+                      Questions for Passage {currentPassage.order}
                     </h3>
                     {currentPassageQuestions.length > 0 ? (
                       currentPassageQuestions.map((question) => (
@@ -489,7 +494,10 @@ const EnglishSectionPage: React.FC = () => {
                         >
                           <h4 className="text-lg font-semibold text-gray-700 mb-2">
                             {/* Use global index for question numbering */}
-                            Question {allSortedQuestions.findIndex(q => q.id === question.id) + 1}
+                            Question{' '}
+                            {allSortedQuestions.findIndex(
+                              (q) => q.id === question.id
+                            ) + 1}
                           </h4>
                           {question.question_context && (
                             <h6 className="p-4 border bg-gray-200 rounded-md text-sm text-gray-700 mb-3">
