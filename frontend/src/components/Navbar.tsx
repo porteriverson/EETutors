@@ -13,6 +13,7 @@ const navItems: NavItem[] = [
   { name: 'About', path: '/about' },
   { name: 'Services', path: '/services' },
   { name: 'Contact', path: '/contact' },
+  { name: 'Login', path: '/auth/login'}
 ];
 
 const Navbar: React.FC = () => {

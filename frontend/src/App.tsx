@@ -9,6 +9,10 @@ import MathSectionPage from './pages/MathSectionPage'
 import ReadingSectionPage from './pages/ReadingSectionPage'
 import ScienceSectionPage from './pages/ScienceSectionPage'
 import { Analytics } from "@vercel/analytics/react"
+import { LoginForm } from './components/login-form'
+import { SignUpForm } from './components/sign-up-form'
+import { ForgotPasswordForm } from './components/forgot-password-form'
+import { UpdatePasswordForm } from './components/update-password-form'
 
 function App() {
   return (
@@ -24,6 +28,10 @@ function App() {
             <Route path="/test/:testId/section/Math/:sectionId" element={<MathSectionPage />} />
             <Route path="/test/:testId/section/Reading/:sectionId" element={<ReadingSectionPage />} />
             <Route path="/test/:testId/section/Science/:sectionId" element={<ScienceSectionPage />} />
+            <Route path="auth/login" element={<LoginForm />}/>
+            <Route path="/sign-up" element={<SignUpForm />}/>
+            <Route path="/forgot-password" element={<ForgotPasswordForm />}/>
+            <Route path="/update-password" element={<UpdatePasswordForm />}/>
           </Routes>
         </BrowserRouter>
         <Analytics />
