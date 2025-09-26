@@ -31,7 +31,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       })
       if (error) throw error
       // Update this route to redirect to an authenticated route. The user already has an active session.
-      location.href = '/'
+      location.href = '/dashboard'
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
@@ -63,12 +63,6 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">Password</Label>
-                  <a
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
                 </div>
                 <Input
                   id="password"
@@ -77,6 +71,12 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                  <a
+                    href="/auth/forgot-password"
+                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                  >
+                    Forgot password?
+                  </a>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>
@@ -85,7 +85,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
             </div>
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{' '}
-              <a href="/sign-up" className="underline underline-offset-4">
+              <a href="/auth/sign-up" className="underline underline-offset-4">
                 Sign up
               </a>
             </div>

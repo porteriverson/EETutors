@@ -10,9 +10,9 @@ interface NavItem {
 // List of navigation items - easily changeable here
 const navItems: NavItem[] = [
   { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
+  // { name: 'About', path: '/about' },
   { name: 'Services', path: '/services' },
-  { name: 'Contact', path: '/contact' },
+  // { name: 'Contact', path: '/contact' },
   { name: 'Login', path: '/auth/login'}
 ];
 
